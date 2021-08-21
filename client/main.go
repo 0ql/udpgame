@@ -1,12 +1,16 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
 )
 
-var Win *pixelgl.Window
+var (
+	Win *pixelgl.Window
+)
 
 func run() {
 	cfg := pixelgl.WindowConfig{
@@ -22,13 +26,22 @@ func run() {
 		panic(err)
 	}
 
+	gameState = New()
+
 	for !Win.Closed() {
 		Win.Clear(colornames.Whitesmoke)
+
+		fmt.Println(gameState)
+		for key := range gameState.players {
+			player := gameState.players[key]
+			player.Draw()
+		}
 
 		Win.Update()
 	}
 }
 
 func main() {
+	// go StartConnection("localhost:8080")
 	pixelgl.Run(run)
 }
