@@ -8,6 +8,10 @@ import (
 	"golang.org/x/image/colornames"
 )
 
+var (
+	PLAYER_THICKNESS float64 = 10
+)
+
 type Player struct {
 	id      byte
 	coord_x uint64

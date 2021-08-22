@@ -49,14 +49,11 @@ func StartConnection(serverIP string) {
 				continue
 			}
 
-			fromBinary(buf)
+			packetDecoder := PacketDecoderNew(buf)
+
+			if packetDecoder.GetPacketType() == STATE_PACKET_ID {
+				gameState.UpdateFromPacket(packetDecoder)
+			}
 		}
 	}()
-}
-
-func fromBinary(buf []byte) {
-	if buf[0] == STATE_PACKET_ID {
-		// init state
-		// state.fromBinary(buf)
-	}
 }

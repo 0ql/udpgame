@@ -26,7 +26,7 @@ func run() {
 		panic(err)
 	}
 
-	gameState = New()
+	gameState = StateNew()
 
 	for !Win.Closed() {
 		Win.Clear(colornames.Whitesmoke)

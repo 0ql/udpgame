@@ -16,7 +16,7 @@ var (
 	gameState = state{}
 )
 
-func New() state {
+func StateNew() state {
 	gs := state{}
 	gs.timestamp = make([]byte, 4)
 	gs.playercount = 1
@@ -30,35 +30,32 @@ func New() state {
 	return gs
 }
 
-func (self *state) fromBinary(buf []byte) {
-	self.timestamp = BufChunkToByteArray(buf, 1, 4)
+func (own_state *state) UpdateFromPacket(packetDecoder PacketDecoder) {
+	own_state.timestamp = packetDecoder.ExtractData(4)
+	own_state.playercount = packetDecoder.ExtractByte()
 
-	self.playercount = buf[5]
+	for i := 6; i < int(own_state.playercount); i += 9 {
+		player := Player{}
 
-	for i := 6; i < int(self.playercount); i += 9 {
-		var player = Player{}
+		player.id = packetDecoder.ExtractByte()
+		player.coord_x = binary.BigEndian.Uint64(packetDecoder.ExtractData(4))
+		player.coord_x = binary.BigEndian.Uint64(packetDecoder.ExtractData(4))
 
-		player.id = buf[i]
-		player.coord_x = BufChunkToUint64(buf, i+1, 4)
-		player.coord_y = BufChunkToUint64(buf, i+2, 4)
-		self.players[player.id] = player
+		own_state.players[player.id] = player
 	}
 }
 
-func (self *state) toBinary() []byte {
+func (own_state *state) ToPacket() []byte {
 	my_player := gameState.players[gameState.my_id]
 
-	packet := make([]byte, 14)
+	packet := PacketBuilderNew(STATE_PACKET_ID)
 
-	packet[0] = STATE_PACKET_ID
+	packet.add_data(Uint64ToByteArray(uint64(time.Since(gameConnection.start_time).Milliseconds())))
 
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(time.Now().Sub(gameConnection.start_time).Milliseconds()))
-	InsertBufChunkInBuf(packet, b)
+	packet.add_byte(my_player.id)
 
-	packet[6] = self.my_id
-	InsertBufChunkInBuf(packet, my_player.coord_x, 7)
-	InsertBufChunkInBuf(packet, my_player.coord_y, 11)
+	packet.add_data(Uint64ToByteArray(my_player.coord_x))
+	packet.add_data(Uint64ToByteArray(my_player.coord_y))
 
-	return packet
+	return packet.build()
 }
