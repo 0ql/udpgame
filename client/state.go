@@ -2,13 +2,8 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
-	"net"
+	"time"
 )
-
-type connection struct {
-	addr string
-}
 
 type state struct {
 	timestamp   []byte
@@ -18,8 +13,7 @@ type state struct {
 }
 
 var (
-	connections = map[string]connection{}
-	gameState   = state{}
+	gameState = state{}
 )
 
 func New() state {
@@ -36,80 +30,35 @@ func New() state {
 	return gs
 }
 
-func readToByteArray(buf []byte, leftOffset int, length int) []byte {
-	var temp []byte
-
-	for i := leftOffset; i < leftOffset+length; i++ {
-		temp = append(temp, buf[i])
-	}
-
-	return temp
-}
-
-func readToUint64(buf []byte, leftOffset int, length int) uint64 {
-	return binary.BigEndian.Uint64(readToByteArray(buf, leftOffset, length))
-}
-
 func (self *state) fromBinary(buf []byte) {
-	for i := 0; i < 4; i++ {
-		self.timestamp = append(self.timestamp, buf[i])
-	}
+	self.timestamp = BufChunkToByteArray(buf, 1, 4)
 
-	self.playercount = buf[4]
+	self.playercount = buf[5]
 
-	for i := 5; i < int(self.playercount); i += 9 {
+	for i := 6; i < int(self.playercount); i += 9 {
 		var player = Player{}
 
 		player.id = buf[i]
-		player.coord_x = readToUint64(buf, i+1, 4)
-		player.coord_y = readToUint64(buf, i+2, 4)
+		player.coord_x = BufChunkToUint64(buf, i+1, 4)
+		player.coord_y = BufChunkToUint64(buf, i+2, 4)
 		self.players[player.id] = player
 	}
 }
 
-// func (self *state) toBinary() {
-// 	me := self.players[self.my_id]
-// 	packet = make([]byte, 13)
+func (self *state) toBinary() []byte {
+	my_player := gameState.players[gameState.my_id]
 
-// 	for i := 0; i < 4; i++ {
-// 		packet
-// 	}
-// }
+	packet := make([]byte, 14)
 
-func StartConnection(serverIP string) {
-	fmt.Println("Connecting to Server")
+	packet[0] = STATE_PACKET_ID
 
-	raddr, err := net.ResolveUDPAddr("udp", serverIP)
-	if err != nil {
-		panic(err)
-	}
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(time.Now().Sub(gameConnection.start_time).Milliseconds()))
+	InsertBufChunkInBuf(packet, b)
 
-	con, err := net.DialUDP("udp", nil, raddr)
-	if err != nil {
-		panic(err)
-	}
+	packet[6] = self.my_id
+	InsertBufChunkInBuf(packet, my_player.coord_x, 7)
+	InsertBufChunkInBuf(packet, my_player.coord_y, 11)
 
-	buf := make([]byte, 100)
-
-	// helloMsg := []byte("n")
-
-	// con.WriteTo(helloMsg)
-
-	defer con.Close()
-
-	go func() {
-		_, addr, err := con.ReadFrom(buf)
-		if err != nil {
-			fmt.Println("Error receving packet")
-		}
-
-		if _, ok := connections[addr.String()]; ok {
-			// existing client
-		} else {
-			// new Client
-			connections[addr.String()] = connection{
-				addr: addr.String(),
-			}
-		}
-	}()
+	return packet
 }
