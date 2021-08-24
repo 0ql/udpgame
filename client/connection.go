@@ -1,59 +1,113 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
 )
 
-type connection struct {
+type UDPCon struct {
 	addr       string
 	con        *net.UDPConn
 	start_time time.Time
 }
 
-var (
-	gameConnection connection
-)
+type TCPCon struct {
+	addr       string
+	con        *net.TCPConn
+	start_time time.Time
+}
 
-func StartConnection(serverIP string) {
-	fmt.Println("Connecting to Server")
-
-	raddr, err := net.ResolveUDPAddr("udp", serverIP)
+func NewTCPConn(address string) (TCPCon, error) {
+	tcpaddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
-		panic(err)
+		fmt.Println("sdf")
+		return TCPCon{}, err
 	}
 
-	con, err := net.DialUDP("udp", nil, raddr)
+	con, err := net.DialTCP("tcp", nil, tcpaddr)
 	if err != nil {
-		panic(err)
+		return TCPCon{}, err
 	}
 
-	gameConnection = connection{
-		addr:       raddr.String(),
+	return TCPCon{
 		con:        con,
+		addr:       address,
 		start_time: time.Now(),
+	}, nil
+}
+
+func NewUDPConn(serverURL string, port string) (UDPCon, error) {
+	udpaddr, err := net.ResolveUDPAddr(serverURL, port)
+	if err != nil {
+		return UDPCon{}, nil
 	}
 
-	// helloMsg := []byte("n")
-	// con.WriteTo(helloMsg)
+	con, err := net.DialUDP("udp", nil, udpaddr)
+	if err != nil {
+		return UDPCon{}, nil
+	}
 
-	defer con.Close()
+	return UDPCon{
+		con:        con,
+		addr:       serverURL,
+		start_time: time.Now(),
+	}, nil
+}
 
-	go func() {
-		buf := make([]byte, 100)
-		for {
-			_, _, err := con.ReadFrom(buf)
-			if err != nil {
-				fmt.Println("Error receving packet")
-				continue
-			}
+func (tcp *TCPCon) SendConnectRequestPacket(playerName string) error {
+	packet := make([]byte, 1)
 
-			packetDecoder := PacketDecoderNew(buf)
+	// don't have to set packet type because []byte by default Zeros
 
-			if packetDecoder.GetPacketType() == STATE_PACKET_ID {
-				gameState.UpdateFromPacket(packetDecoder)
-			}
+	if len(playerName) > 8 {
+		return errors.New("Playername too long")
+	}
+	name := []byte("player")
+	packet = append(packet, name...)
+
+	_, err := tcp.con.Write(packet)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// blocking
+func (tcp *TCPCon) sendStayAlivePackets() {
+	packet := make([]byte, 0)
+
+	packet = append(packet, byte(4))
+	for {
+		time.Sleep(500 * time.Millisecond)
+		fmt.Printf("Sending Stay Alive Packet to: %s \n", tcp.addr)
+		_, err := tcp.con.Write(packet)
+		if err != nil {
+			panic(err)
 		}
-	}()
+	}
+}
+
+func (tcp *TCPCon) ListenPackets() error {
+	buf := make([]byte, 100)
+
+	for {
+		err := tcp.con.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			return err
+		}
+
+		_, err = tcp.con.Read(buf)
+		if err != nil {
+			fmt.Println("Error receiving TCP packet")
+			return err
+		}
+
+		if buf[0] == 0 {
+			go tcp.sendStayAlivePackets()
+		}
+	}
+
 }

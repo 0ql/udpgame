@@ -42,6 +42,20 @@ func run() {
 }
 
 func main() {
+	tcpconnection, err := NewTCPConn("localhost:8080")
+	if err != nil {
+		panic(err)
+	}
+
+	err = tcpconnection.SendConnectRequestPacket("hans")
+	if err != nil {
+		panic(err)
+	}
+
+	err = tcpconnection.ListenPackets()
+	if err != nil {
+		panic(err)
+	}
 	// go StartConnection("localhost:8080")
-	pixelgl.Run(run)
+	// pixelgl.Run(run)
 }
