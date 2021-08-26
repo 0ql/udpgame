@@ -1,10 +1,15 @@
 package main
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
 	"time"
+)
+
+const (
+	STATE_PACKET_TIMEOUT = "33ms" // not exactly 30 Hz, maybe rather 25Hz (40ms)
 )
 
 type UDPCon struct {
@@ -110,4 +115,83 @@ func (tcp *TCPCon) ListenPackets() error {
 		}
 	}
 
+}
+
+func (tcp *TCPCon) waitForTCPConnectPacket() {
+	buf := make([]byte, 100)
+	tcp.con.Read(buf)
+
+	pd := PacketDecoderNew(buf)
+
+	if pd.GetPacketType() != TCP_CONNECT_PACKET {
+		fmt.Println("wrong packet type")
+	}
+
+	gameState.my_id = pd.ExtractByte()
+}
+
+func (tcp *TCPCon) sendChunkRequestPacket() {
+	pb := PacketBuilderNew(TCP_CHUNK_REQUEST_PACKET)
+	pb.add_data(Uint64ToByteArray(0))
+	pb.add_data(Uint64ToByteArray(0))
+
+	tcp.con.Write(pb.build())
+}
+
+func (tcp *TCPCon) sendPlayerlistRequestPacket() {
+	pb := PacketBuilderNew(TCP_PLAYERLIST_REQUEST_PACKET)
+
+	tcp.con.Write(pb.build())
+}
+
+func (tcp *TCPCon) waitForTCPPlayerlistPacket() {
+	buf := make([]byte, 100)
+	tcp.con.Read(buf)
+
+	pd := PacketDecoderNew(buf)
+
+	if pd.GetPacketType() != TCP_PLAYERLIST_PACKET {
+		fmt.Println("wrong packet type")
+	}
+
+	gameState.playercount = pd.ExtractByte()
+
+	for i := 0; i < int(gameState.playercount); i++ {
+		player := Player{
+			id:      pd.ExtractByte(),
+			coord_x: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
+			coord_y: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
+		}
+
+		gameState.players[player.id] = player
+	}
+}
+
+func (udp *UDPCon) handleUDPPackets() {
+	buf := make([]byte, 100)
+	for {
+		_, _, err := udp.con.ReadFrom(buf)
+		if err != nil {
+			fmt.Println("Error receving packet")
+			continue
+		}
+
+		packetDecoder := PacketDecoderNew(buf)
+
+		if packetDecoder.GetPacketType() == UDP_STATE_PACKET {
+			gameState.UpdateFromPacket(packetDecoder)
+		}
+	}
+}
+
+func (udp *UDPCon) sendStatePackets() {
+	timeout, err := time.ParseDuration(STATE_PACKET_TIMEOUT)
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		udp.con.Write(gameState.ToPacket(udp.start_time))
+		time.Sleep(timeout)
+	}
 }

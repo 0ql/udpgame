@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
@@ -31,7 +29,6 @@ func run() {
 	for !Win.Closed() {
 		Win.Clear(colornames.Whitesmoke)
 
-		fmt.Println(gameState)
 		for key := range gameState.players {
 			player := gameState.players[key]
 			player.Draw()

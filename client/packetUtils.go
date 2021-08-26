@@ -1,7 +1,12 @@
 package main
 
-var (
-	STATE_PACKET_ID byte = 1
+const (
+	TCP_CONNECT_REQUEST_PACKET    byte = 0
+	TCP_CONNECT_PACKET            byte = 0
+	TCP_CHUNK_REQUEST_PACKET      byte = 1
+	TCP_PLAYERLIST_REQUEST_PACKET byte = 2
+	TCP_PLAYERLIST_PACKET         byte = 2
+	UDP_STATE_PACKET              byte = 0
 )
 
 type PacketBuilder struct {

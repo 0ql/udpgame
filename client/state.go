@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"time"
 )
 
 type state struct {
@@ -44,17 +45,17 @@ func (own_state *state) UpdateFromPacket(packetDecoder PacketDecoder) {
 	}
 }
 
-// func (own_state *state) ToPacket() []byte {
-// 	my_player := gameState.players[gameState.my_id]
+func (own_state *state) ToPacket(start_time time.Time) []byte {
+	my_player := gameState.players[gameState.my_id]
 
-// 	packet := PacketBuilderNew(STATE_PACKET_ID)
+	packet := PacketBuilderNew(UDP_STATE_PACKET)
 
-// 	packet.add_data(Uint64ToByteArray(uint64(time.Since(TCPCon.start_time).Milliseconds())))
+	packet.add_data(Uint64ToByteArray(uint64(time.Since(start_time).Milliseconds())))
 
-// 	packet.add_byte(my_player.id)
+	packet.add_byte(my_player.id)
 
-// 	packet.add_data(Uint64ToByteArray(my_player.coord_x))
-// 	packet.add_data(Uint64ToByteArray(my_player.coord_y))
+	packet.add_data(Uint64ToByteArray(my_player.coord_x))
+	packet.add_data(Uint64ToByteArray(my_player.coord_y))
 
-// 	return packet.build()
-// }
+	return packet.build()
+}
