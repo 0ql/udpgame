@@ -1,4 +1,4 @@
-package main
+package util
 
 const (
 	TCP_CONNECT_REQUEST_PACKET    byte = 0
@@ -20,15 +20,15 @@ func PacketBuilderNew(packetType byte) PacketBuilder {
 	return pb
 }
 
-func (packetBuilder *PacketBuilder) add_data(bytes []byte) {
+func (packetBuilder *PacketBuilder) AddData(bytes []byte) {
 	packetBuilder.data = append(packetBuilder.data, bytes...)
 }
 
-func (packetBuilder *PacketBuilder) add_byte(singleByte byte) {
-	packetBuilder.add_data([]byte{singleByte})
+func (packetBuilder *PacketBuilder) AddByte(singleByte byte) {
+	packetBuilder.AddData([]byte{singleByte})
 }
 
-func (packetBuilder *PacketBuilder) build() []byte {
+func (packetBuilder *PacketBuilder) Build() []byte {
 	return packetBuilder.data
 }
 

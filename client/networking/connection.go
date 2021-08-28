@@ -1,6 +1,8 @@
-package main
+package networking
 
 import (
+	"client/rendering"
+	"client/util"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -121,49 +123,49 @@ func (tcp *TCPCon) waitForTCPConnectPacket() {
 	buf := make([]byte, 100)
 	tcp.con.Read(buf)
 
-	pd := PacketDecoderNew(buf)
+	pd := util.PacketDecoderNew(buf)
 
-	if pd.GetPacketType() != TCP_CONNECT_PACKET {
+	if pd.GetPacketType() != util.TCP_CONNECT_PACKET {
 		fmt.Println("wrong packet type")
 	}
 
-	gameState.my_id = pd.ExtractByte()
+	rendering.GameState.My_id = pd.ExtractByte()
 }
 
 func (tcp *TCPCon) sendChunkRequestPacket() {
-	pb := PacketBuilderNew(TCP_CHUNK_REQUEST_PACKET)
-	pb.add_data(Uint64ToByteArray(0))
-	pb.add_data(Uint64ToByteArray(0))
+	pb := util.PacketBuilderNew(util.TCP_CHUNK_REQUEST_PACKET)
+	pb.AddData(util.Uint64ToByteArray(0))
+	pb.AddData(util.Uint64ToByteArray(0))
 
-	tcp.con.Write(pb.build())
+	tcp.con.Write(pb.Build())
 }
 
 func (tcp *TCPCon) sendPlayerlistRequestPacket() {
-	pb := PacketBuilderNew(TCP_PLAYERLIST_REQUEST_PACKET)
+	pb := util.PacketBuilderNew(util.TCP_PLAYERLIST_REQUEST_PACKET)
 
-	tcp.con.Write(pb.build())
+	tcp.con.Write(pb.Build())
 }
 
 func (tcp *TCPCon) waitForTCPPlayerlistPacket() {
 	buf := make([]byte, 100)
 	tcp.con.Read(buf)
 
-	pd := PacketDecoderNew(buf)
+	pd := util.PacketDecoderNew(buf)
 
-	if pd.GetPacketType() != TCP_PLAYERLIST_PACKET {
+	if pd.GetPacketType() != util.TCP_PLAYERLIST_PACKET {
 		fmt.Println("wrong packet type")
 	}
 
-	gameState.playercount = pd.ExtractByte()
+	rendering.GameState.Playercount = pd.ExtractByte()
 
-	for i := 0; i < int(gameState.playercount); i++ {
-		player := Player{
-			id:      pd.ExtractByte(),
-			coord_x: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
-			coord_y: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
+	for i := 0; i < int(rendering.GameState.Playercount); i++ {
+		player := rendering.Player{
+			Id:      pd.ExtractByte(),
+			Coord_x: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
+			Coord_y: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
 		}
 
-		gameState.players[player.id] = player
+		rendering.GameState.Players[player.Id] = player
 	}
 }
 
@@ -176,10 +178,10 @@ func (udp *UDPCon) handleUDPPackets() {
 			continue
 		}
 
-		packetDecoder := PacketDecoderNew(buf)
+		packetDecoder := util.PacketDecoderNew(buf)
 
-		if packetDecoder.GetPacketType() == UDP_STATE_PACKET {
-			gameState.UpdateFromPacket(packetDecoder)
+		if packetDecoder.GetPacketType() == util.UDP_STATE_PACKET {
+			rendering.GameState.UpdateFromPacket(packetDecoder)
 		}
 	}
 }
@@ -191,7 +193,7 @@ func (udp *UDPCon) sendStatePackets() {
 	}
 
 	for {
-		udp.con.Write(gameState.ToPacket(udp.start_time))
+		udp.con.Write(rendering.GameState.ToPacket(udp.start_time))
 		time.Sleep(timeout)
 	}
 }
