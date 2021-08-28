@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
@@ -26,14 +24,14 @@ func run() {
 		panic(err)
 	}
 
-	gameState = StateNew()
-
 	for !Win.Closed() {
 		Win.Clear(colornames.Whitesmoke)
 
-		fmt.Println(gameState)
-		for key := range gameState.players {
-			player := gameState.players[key]
+		for key := range GS.players {
+			player := GS.players[key]
+			if player.id == GS.my_id {
+				player.Update()
+			}
 			player.Draw()
 		}
 
@@ -42,20 +40,17 @@ func run() {
 }
 
 func main() {
-	tcpconnection, err := NewTCPConn("localhost:8080")
+	tcpConnection, err := NewTCPConn("localhost:8080")
 	if err != nil {
 		panic(err)
 	}
 
-	err = tcpconnection.SendConnectRequestPacket("hans")
+	go tcpConnection.ListenPackets()
+
+	err = tcpConnection.SendConnectRequestPacket("hans")
 	if err != nil {
 		panic(err)
 	}
 
-	err = tcpconnection.ListenPackets()
-	if err != nil {
-		panic(err)
-	}
-	// go StartConnection("localhost:8080")
-	// pixelgl.Run(run)
+	pixelgl.Run(run)
 }

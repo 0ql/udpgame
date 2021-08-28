@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
+	"time"
 )
 
 type state struct {
@@ -12,49 +14,71 @@ type state struct {
 }
 
 var (
-	gameState = state{}
+	GS = state{
+		players: map[byte]Player{},
+	}
 )
 
-func StateNew() state {
-	gs := state{}
-	gs.timestamp = make([]byte, 4)
-	gs.playercount = 1
-	gs.players = map[byte]Player{}
-	gs.my_id = 0
-	gs.players[gs.my_id] = Player{
-		id:      gs.my_id,
-		coord_x: 100,
-		coord_y: 100,
+func (s *state) UpdateFromInitialStatePacket(packet []byte) {
+	var p Player
+	p.id = packet[1]
+	s.my_id = packet[1]
+
+	buf := make([]byte, 4)
+	for i := 2; i <= 5; i++ {
+		buf[i-2] = packet[i]
 	}
-	return gs
+
+	s.timestamp = buf
+
+	s.playercount = packet[6]
+	for i := 7; i <= 10; i++ {
+		buf[i-7] = packet[i]
+		fmt.Println(i)
+	}
+	p.coord_x = binary.BigEndian.Uint32(buf)
+
+	for i := 11; i <= 14; i++ {
+		buf[i-11] = packet[i]
+	}
+	p.coord_y = binary.BigEndian.Uint32(buf)
+
+	s.players[packet[1]] = p
 }
 
-func (own_state *state) UpdateFromPacket(packetDecoder PacketDecoder) {
-	own_state.timestamp = packetDecoder.ExtractData(4)
-	own_state.playercount = packetDecoder.ExtractByte()
+func (s *state) UpdateFromPacket(packet []byte) {
+	s.playercount = packet[5]
 
-	for i := 6; i < int(own_state.playercount); i += 9 {
-		player := Player{}
+	for i := 0; i < int(s.playercount); i++ {
+		coord_x := make([]byte, 4)
+		for j := i; j < i+4; j++ {
+			coord_x[j-i*8] = packet[j]
+		}
 
-		player.id = packetDecoder.ExtractByte()
-		player.coord_x = binary.BigEndian.Uint64(packetDecoder.ExtractData(4))
-		player.coord_x = binary.BigEndian.Uint64(packetDecoder.ExtractData(4))
-
-		own_state.players[player.id] = player
+		coord_y := make([]byte, 4)
+		for j := i + 4; j < i+8; j++ {
+			coord_y[j-i*8] = packet[j]
+		}
+		s.players[packet[i*8]] = Player{
+			id:      packet[i*8],
+			coord_x: binary.BigEndian.Uint32(coord_x),
+			coord_y: binary.BigEndian.Uint32(coord_y),
+		}
 	}
 }
 
-// func (own_state *state) ToPacket() []byte {
-// 	my_player := gameState.players[gameState.my_id]
+func (s *state) ToPacket(st time.Time) []byte {
+	packet := make([]byte, 1)
 
-// 	packet := PacketBuilderNew(STATE_PACKET_ID)
+	duration := uint32(time.Since(st).Milliseconds())
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, duration)
+	packet = append(packet, buf...)
 
-// 	packet.add_data(Uint64ToByteArray(uint64(time.Since(TCPCon.start_time).Milliseconds())))
+	binary.BigEndian.PutUint32(buf, s.players[s.my_id].coord_x)
+	packet = append(packet, buf...)
+	binary.BigEndian.PutUint32(buf, s.players[s.my_id].coord_y)
+	packet = append(packet, buf...)
 
-// 	packet.add_byte(my_player.id)
-
-// 	packet.add_data(Uint64ToByteArray(my_player.coord_x))
-// 	packet.add_data(Uint64ToByteArray(my_player.coord_y))
-
-// 	return packet.build()
-// }
+	return packet
+}

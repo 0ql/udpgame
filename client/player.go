@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
+	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
 )
 
@@ -14,16 +13,29 @@ var (
 
 type Player struct {
 	id      byte
-	coord_x uint64
-	coord_y uint64
+	coord_x uint32
+	coord_y uint32
+}
+
+func (player *Player) Update() {
+	if Win.Pressed(pixelgl.KeyW) {
+		player.coord_y += 3
+	}
+	if Win.Pressed(pixelgl.KeyS) {
+		player.coord_y -= 3
+	}
+	if Win.Pressed(pixelgl.KeyD) {
+		player.coord_x += 3
+	}
+	if Win.Pressed(pixelgl.KeyA) {
+		player.coord_x -= 3
+	}
 }
 
 func (player *Player) Draw() {
-	fmt.Println("draw")
 	circle := imdraw.New(nil)
 	circle.Color = colornames.Black
 	circle.Push(pixel.V(float64(player.coord_x), float64(player.coord_y)))
 	circle.Circle(PLAYER_THICKNESS, 0)
 	circle.Draw(Win)
-
 }
