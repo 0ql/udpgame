@@ -1,35 +1,69 @@
 package networking
 
 import (
-	"client/rendering"
-	"client/util"
-	"encoding/binary"
+	"bytes"
+	r "client/rendering"
 	"errors"
 	"fmt"
 	"net"
 	"time"
 )
 
-const (
-	STATE_PACKET_TIMEOUT = "33ms" // not exactly 30 Hz, maybe rather 25Hz (40ms)
-)
-
 type UDPCon struct {
 	addr       string
 	con        *net.UDPConn
 	start_time time.Time
+	timestamp  []byte
 }
 
 type TCPCon struct {
-	addr       string
-	con        *net.TCPConn
-	start_time time.Time
+	addr         string
+	con          *net.TCPConn
+	udpCon       *UDPCon
+	start_time   time.Time
+	errorChannel chan error
+}
+
+func (udp *UDPCon) sendStatePackets(Hz int) error {
+	dur := time.Duration(1000 / Hz)
+	for {
+		time.Sleep(dur)
+
+		_, err := udp.con.Write(r.GS.ToPacket(udp.start_time))
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func (udp *UDPCon) ListenPackets() error {
+	buf := make([]byte, 100)
+	t := make([]byte, 4)
+	for {
+		_, err := udp.con.Read(buf)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(buf)
+
+		for i := 1; i <= 4; i++ {
+			t = append(t, buf[i])
+		}
+
+		// check if packet is old
+		if bytes.Compare(udp.timestamp, t) == 1 {
+			continue
+		} else {
+			udp.timestamp = t
+		}
+
+		r.GS.UpdateFromPacket(buf)
+	}
 }
 
 func NewTCPConn(address string) (TCPCon, error) {
 	tcpaddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
-		fmt.Println("sdf")
 		return TCPCon{}, err
 	}
 
@@ -45,8 +79,8 @@ func NewTCPConn(address string) (TCPCon, error) {
 	}, nil
 }
 
-func NewUDPConn(serverURL string, port string) (UDPCon, error) {
-	udpaddr, err := net.ResolveUDPAddr(serverURL, port)
+func NewUDPConn(serverAddress string) (UDPCon, error) {
+	udpaddr, err := net.ResolveUDPAddr("udp", serverAddress)
 	if err != nil {
 		return UDPCon{}, nil
 	}
@@ -58,22 +92,36 @@ func NewUDPConn(serverURL string, port string) (UDPCon, error) {
 
 	return UDPCon{
 		con:        con,
-		addr:       serverURL,
+		addr:       serverAddress,
 		start_time: time.Now(),
+		timestamp:  r.GS.Timestamp,
 	}, nil
 }
 
 func (tcp *TCPCon) SendConnectRequestPacket(playerName string) error {
+	fmt.Println("Connecting to Server...")
 	packet := make([]byte, 1)
 
 	// don't have to set packet type because []byte by default Zeros
 
 	if len(playerName) > 8 {
-		return errors.New("Playername too long")
+		return errors.New("playername too long")
 	}
 	name := []byte("player")
 	packet = append(packet, name...)
 
+	_, err := tcp.con.Write(packet)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (tcp *TCPCon) SendPlayerListRequestPacket() error {
+	packet := make([]byte, 0)
+
+	packet = append(packet, byte(2))
 	_, err := tcp.con.Write(packet)
 	if err != nil {
 		return err
@@ -92,7 +140,8 @@ func (tcp *TCPCon) sendStayAlivePackets() {
 		fmt.Printf("Sending Stay Alive Packet to: %s \n", tcp.addr)
 		_, err := tcp.con.Write(packet)
 		if err != nil {
-			panic(err)
+			tcp.errorChannel <- err
+			break
 		}
 	}
 }
@@ -112,88 +161,25 @@ func (tcp *TCPCon) ListenPackets() error {
 			return err
 		}
 
-		if buf[0] == 0 {
+		switch buf[0] {
+		case 0:
+			fmt.Println(buf)
+			r.GS.UpdateFromInitialStatePacket(buf)
 			go tcp.sendStayAlivePackets()
-		}
-	}
-
-}
-
-func (tcp *TCPCon) waitForTCPConnectPacket() {
-	buf := make([]byte, 100)
-	tcp.con.Read(buf)
-
-	pd := util.PacketDecoderNew(buf)
-
-	if pd.GetPacketType() != util.TCP_CONNECT_PACKET {
-		fmt.Println("wrong packet type")
-	}
-
-	rendering.GameState.My_id = pd.ExtractByte()
-}
-
-func (tcp *TCPCon) sendChunkRequestPacket() {
-	pb := util.PacketBuilderNew(util.TCP_CHUNK_REQUEST_PACKET)
-	pb.AddData(util.Uint64ToByteArray(0))
-	pb.AddData(util.Uint64ToByteArray(0))
-
-	tcp.con.Write(pb.Build())
-}
-
-func (tcp *TCPCon) sendPlayerlistRequestPacket() {
-	pb := util.PacketBuilderNew(util.TCP_PLAYERLIST_REQUEST_PACKET)
-
-	tcp.con.Write(pb.Build())
-}
-
-func (tcp *TCPCon) waitForTCPPlayerlistPacket() {
-	buf := make([]byte, 100)
-	tcp.con.Read(buf)
-
-	pd := util.PacketDecoderNew(buf)
-
-	if pd.GetPacketType() != util.TCP_PLAYERLIST_PACKET {
-		fmt.Println("wrong packet type")
-	}
-
-	rendering.GameState.Playercount = pd.ExtractByte()
-
-	for i := 0; i < int(rendering.GameState.Playercount); i++ {
-		player := rendering.Player{
-			Id:      pd.ExtractByte(),
-			Coord_x: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
-			Coord_y: uint64(binary.BigEndian.Uint64(pd.ExtractData(4))),
-		}
-
-		rendering.GameState.Players[player.Id] = player
-	}
-}
-
-func (udp *UDPCon) handleUDPPackets() {
-	buf := make([]byte, 100)
-	for {
-		_, _, err := udp.con.ReadFrom(buf)
-		if err != nil {
-			fmt.Println("Error receving packet")
+			tcp.SendPlayerListRequestPacket()
+			udpCon, err := NewUDPConn(tcp.addr)
+			fmt.Println("Starting UDP Connection...")
+			if err != nil {
+				panic(err)
+			}
+			tcp.udpCon = &udpCon
+			go tcp.udpCon.sendStatePackets(30)
+		case 1:
+			continue
+		case 2:
+			// save playerlist
 			continue
 		}
-
-		packetDecoder := util.PacketDecoderNew(buf)
-
-		if packetDecoder.GetPacketType() == util.UDP_STATE_PACKET {
-			rendering.GameState.UpdateFromPacket(packetDecoder)
-		}
-	}
-}
-
-func (udp *UDPCon) sendStatePackets() {
-	timeout, err := time.ParseDuration(STATE_PACKET_TIMEOUT)
-	if err != nil {
-		panic(err)
 	}
 
-	for {
-		udp.con.Write(rendering.GameState.ToPacket(udp.start_time))
-		time.Sleep(timeout)
-	}
 }

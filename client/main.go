@@ -1,13 +1,12 @@
 package main
 
 import (
+	n "client/networking"
+	"client/rendering"
+
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
-)
-
-var (
-	Win *pixelgl.Window
 )
 
 func run() {
@@ -18,29 +17,28 @@ func run() {
 	}
 
 	win, err := pixelgl.NewWindow(cfg)
-	Win = win
 
 	if err != nil {
 		panic(err)
 	}
 
-	for !Win.Closed() {
-		Win.Clear(colornames.Whitesmoke)
+	for !win.Closed() {
+		win.Clear(colornames.Whitesmoke)
 
-		for key := range GS.players {
-			player := GS.players[key]
-			if player.id == GS.my_id {
-				player.Update()
+		for key := range rendering.GS.Players {
+			player := rendering.GS.Players[key]
+			if player.Id == rendering.GS.My_id {
+				player.Update(win)
 			}
-			player.Draw()
+			player.Draw(win)
 		}
 
-		Win.Update()
+		win.Update()
 	}
 }
 
 func main() {
-	tcpConnection, err := NewTCPConn("localhost:8080")
+	tcpConnection, err := n.NewTCPConn("localhost:8080")
 	if err != nil {
 		panic(err)
 	}
