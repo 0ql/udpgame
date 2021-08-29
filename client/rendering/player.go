@@ -1,4 +1,4 @@
-package main
+package rendering
 
 import (
 	"github.com/faiface/pixel"
@@ -35,7 +35,7 @@ func (player *Player) Update() {
 func (player *Player) Draw() {
 	circle := imdraw.New(nil)
 	circle.Color = colornames.Black
-	circle.Push(pixel.V(float64(player.coord_x), float64(player.coord_y)))
+	circle.Push(pixel.V(float64(player.Coord_x), float64(player.Coord_y)))
 	circle.Circle(PLAYER_THICKNESS, 0)
 	circle.Draw(Win)
 }

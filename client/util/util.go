@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"encoding/binary"
@@ -8,9 +8,9 @@ import (
 // 	return buf[leftOffset : leftOffset+length]
 // }
 
-// func BufChunkToUint64(buf []byte, leftOffset int, length int) uint64 {
-// 	return binary.BigEndian.Uint64(BufChunkToByteArray(buf, leftOffset, length))
-// }
+func ByteArrayToUint64(buf []byte) uint64 {
+	return binary.BigEndian.Uint64(buf)
+}
 
 // func InsertBufChunkInBuf(buf []byte, insert_buf []byte, offset int) {
 // 	for i := 0; i < len(insert_buf); i++ {
