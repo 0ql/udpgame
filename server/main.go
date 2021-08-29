@@ -21,7 +21,7 @@ func createServer(port string) {
 
 	udpLn := UDPutils.NewUDPListener(":8080", gameStart, &tcpConBundle)
 	go udpLn.HandleUDPPackets()
-	udpLn.SendUDPStatePackets(3)
+	udpLn.SendUDPStatePackets(10)
 }
 
 func main() {

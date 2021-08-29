@@ -29,7 +29,8 @@ func (udp *UDPCon) sendStatePackets(Hz int) error {
 	for {
 		time.Sleep(dur)
 
-		_, err := udp.con.Write(r.GS.ToPacket(udp.start_time))
+		p := r.GS.ToPacket(udp.start_time)
+		_, err := udp.con.Write(p)
 		if err != nil {
 			return err
 		}
@@ -44,7 +45,6 @@ func (udp *UDPCon) ListenPackets() error {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(buf)
 
 		for i := 1; i <= 4; i++ {
 			t = append(t, buf[i])
@@ -79,18 +79,19 @@ func NewTCPConn(address string) (TCPCon, error) {
 	}, nil
 }
 
-func NewUDPConn(serverAddress string) (UDPCon, error) {
+func NewUDPConn(serverAddress string) (*UDPCon, error) {
 	udpaddr, err := net.ResolveUDPAddr("udp", serverAddress)
 	if err != nil {
-		return UDPCon{}, nil
+		panic(err)
 	}
 
 	con, err := net.DialUDP("udp", nil, udpaddr)
 	if err != nil {
-		return UDPCon{}, nil
+		panic(err)
 	}
+	fmt.Printf("LOCAL UDP ADDR: %s \n", con.LocalAddr().String())
 
-	return UDPCon{
+	return &UDPCon{
 		con:        con,
 		addr:       serverAddress,
 		start_time: time.Now(),
@@ -135,6 +136,7 @@ func (tcp *TCPCon) sendStayAlivePackets() {
 	packet := make([]byte, 0)
 
 	packet = append(packet, byte(4))
+	fmt.Println(packet)
 	for {
 		time.Sleep(500 * time.Millisecond)
 		fmt.Printf("Sending Stay Alive Packet to: %s \n", tcp.addr)
@@ -163,16 +165,17 @@ func (tcp *TCPCon) ListenPackets() error {
 
 		switch buf[0] {
 		case 0:
-			fmt.Println(buf)
+			fmt.Println("TCPConnection Confirmed")
 			r.GS.UpdateFromInitialStatePacket(buf)
 			go tcp.sendStayAlivePackets()
-			tcp.SendPlayerListRequestPacket()
+			// tcp.SendPlayerListRequestPacket()
 			udpCon, err := NewUDPConn(tcp.addr)
 			fmt.Println("Starting UDP Connection...")
+			tcp.udpCon = udpCon
 			if err != nil {
 				panic(err)
 			}
-			tcp.udpCon = &udpCon
+			go tcp.udpCon.ListenPackets()
 			go tcp.udpCon.sendStatePackets(30)
 		case 1:
 			continue

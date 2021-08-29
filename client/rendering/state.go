@@ -9,17 +9,18 @@ import (
 type state struct {
 	Timestamp   []byte
 	playercount byte
-	Players     map[byte]Player
+	Players     map[byte]*Player
 	My_id       byte
 }
 
 var (
 	GS = state{
-		Players: map[byte]Player{},
+		Players: map[byte]*Player{},
 	}
 )
 
 func (s *state) UpdateFromInitialStatePacket(packet []byte) {
+	fmt.Println("Initial RSU")
 	var p Player
 	p.Id = packet[1]
 	s.My_id = packet[1]
@@ -43,26 +44,31 @@ func (s *state) UpdateFromInitialStatePacket(packet []byte) {
 	}
 	p.Coord_y = binary.BigEndian.Uint32(buf)
 
-	s.Players[packet[1]] = p
+	s.Players[packet[1]] = &p
 }
 
 func (s *state) UpdateFromPacket(packet []byte) {
+	fmt.Println("RSU")
 	s.playercount = packet[5]
 
 	for i := 0; i < int(s.playercount); i++ {
-		coord_x := make([]byte, 4)
-		for j := i; j < i+4; j++ {
-			coord_x[j-i*8] = packet[j]
-		}
+		for j := 6 + i*7; j <= 6+i*7+7; j++ {
+			coord_x := make([]byte, 4)
 
-		coord_y := make([]byte, 4)
-		for j := i + 4; j < i+8; j++ {
-			coord_y[j-i*8] = packet[j]
-		}
-		s.Players[packet[i*8]] = Player{
-			Id:      packet[i*8],
-			Coord_x: binary.BigEndian.Uint32(coord_x),
-			Coord_y: binary.BigEndian.Uint32(coord_y),
+			for k := 0; k <= 3; k++ {
+				coord_x[k] = packet[j+1+k]
+			}
+
+			coord_y := make([]byte, 4)
+			for k := 0; k <= 3; k++ {
+				coord_y[k] = packet[j+4+k]
+			}
+
+			s.Players[packet[i*7+6]] = &Player{
+				Id:      packet[i*7+6],
+				Coord_x: binary.BigEndian.Uint32(coord_x),
+				Coord_y: binary.BigEndian.Uint32(coord_y),
+			}
 		}
 	}
 }

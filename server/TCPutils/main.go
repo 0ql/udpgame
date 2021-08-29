@@ -9,11 +9,18 @@ import (
 
 var gs time.Time
 
+type TCPConBundle struct {
+	Connections          map[string]*TCPConnection
+	removeConnectionChan chan string
+	MAXPPS               uint
+}
+
 type TCPConnection struct {
-	addr string
-	Con  net.Conn
-	ID   byte // same as player ID
-	pps  *uint
+	addr         string
+	Con          net.Conn
+	ID           byte // same as player ID
+	pps          *uint
+	parentBundle *TCPConBundle
 }
 
 func (tcp *TCPConnection) createConnectRequestResponsePacket() []byte {
@@ -24,7 +31,13 @@ func (tcp *TCPConnection) createConnectRequestResponsePacket() []byte {
 	duration := uint32(time.Since(gs).Milliseconds())
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, duration)
-	return append(packet, buf...)
+
+	packet = append(packet, byte(len(tcp.parentBundle.Connections)))
+
+	buf = make([]byte, 4)
+	packet = append(packet, buf...)
+	packet = append(packet, buf...)
+	return packet
 }
 
 func (tcp *TCPConnection) createStayAliveConfirmationPacket() []byte {
@@ -58,7 +71,7 @@ func (tcp *TCPConnection) handleTCPConnection(kill chan string) {
 		if buf[0] == 0 {
 			pack = tcp.createConnectRequestResponsePacket()
 		} else if buf[0] == 4 {
-			fmt.Printf("Sending Stay Alive Packet to: %s at %d PPS \n", tcp.addr, *tcp.pps)
+			fmt.Printf("TCP SAL to: %s at %d PPS \n", tcp.addr, *tcp.pps)
 			pack = tcp.createStayAliveConfirmationPacket()
 		}
 
@@ -70,16 +83,10 @@ func (tcp *TCPConnection) handleTCPConnection(kill chan string) {
 	}
 }
 
-type TCPConBundle struct {
-	Connections          map[string]TCPConnection
-	removeConnectionChan chan string
-	MAXPPS               uint
-}
-
 func NewTCPConBundle(maxpps uint, gameStart time.Time) TCPConBundle {
 	gs = gameStart
 	return TCPConBundle{
-		Connections:          map[string]TCPConnection{},
+		Connections:          map[string]*TCPConnection{},
 		removeConnectionChan: make(chan string),
 		MAXPPS:               maxpps,
 	}
@@ -144,11 +151,13 @@ func (bundle *TCPConBundle) CreateTCPlistener(port string) error {
 
 		pps := uint(0)
 		if id, found := bundle.findAvailableID(); found {
-			bundle.Connections[con.RemoteAddr().String()] = TCPConnection{
-				addr: con.RemoteAddr().String(),
-				Con:  con,
-				ID:   id,
-				pps:  &pps,
+
+			bundle.Connections[con.RemoteAddr().String()] = &TCPConnection{
+				addr:         con.RemoteAddr().String(),
+				Con:          con,
+				ID:           id,
+				pps:          &pps,
+				parentBundle: bundle,
 			}
 
 			c := bundle.Connections[con.RemoteAddr().String()]
