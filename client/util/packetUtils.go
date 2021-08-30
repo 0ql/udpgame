@@ -37,7 +37,7 @@ type PacketDecoder struct {
 	index int
 }
 
-func PacketDecoderNew(data []byte) PacketDecoder {
+func NewPacketDecoder(data []byte) PacketDecoder {
 	return PacketDecoder{
 		data:  data,
 		index: 1,
@@ -56,4 +56,8 @@ func (packetDecoder *PacketDecoder) ExtractData(length int) []byte {
 
 func (packetDecoder *PacketDecoder) ExtractByte() byte {
 	return packetDecoder.ExtractData(1)[0]
+}
+
+func (packetDecoder *PacketDecoder) SetIndex(i int) {
+	packetDecoder.index = i
 }

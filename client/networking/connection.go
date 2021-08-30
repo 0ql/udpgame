@@ -9,8 +9,10 @@ import (
 	"time"
 )
 
+var serverAddr net.Addr
+
 type UDPCon struct {
-	addr       string
+	raddr      net.UDPAddr
 	con        *net.UDPConn
 	start_time time.Time
 	timestamp  []byte
@@ -24,26 +26,53 @@ type TCPCon struct {
 	errorChannel chan error
 }
 
+func NewUDPConn(localAddr net.Addr, raddr net.UDPAddr) (*UDPCon, error) {
+	udpaddr, err := net.ResolveUDPAddr("udp", localAddr.String())
+	if err != nil {
+		panic(err)
+	}
+
+	udpLn, err := net.ListenUDP("udp", udpaddr)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("LOCAL UDP ADDR: %s \n", udpLn.LocalAddr().String())
+
+	return &UDPCon{
+		raddr:      raddr,
+		con:        udpLn,
+		start_time: time.Now(),
+		timestamp:  r.GS.Timestamp,
+	}, nil
+}
+
 func (udp *UDPCon) sendStatePackets(Hz int) error {
 	dur := time.Duration(1000 / Hz)
 	for {
 		time.Sleep(dur)
 
 		p := r.GS.ToPacket(udp.start_time)
-		_, err := udp.con.Write(p)
+		_, _, err := udp.con.WriteMsgUDP(p, nil, &udp.raddr)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 }
 
+// blocking
 func (udp *UDPCon) ListenPackets() error {
 	buf := make([]byte, 100)
 	t := make([]byte, 4)
 	for {
-		_, err := udp.con.Read(buf)
+		_, addr, err := (*udp.con).ReadFrom(buf)
+		fmt.Println(buf)
 		if err != nil {
 			panic(err)
+		}
+
+		if addr.String() != serverAddr.String() {
+			continue
 		}
 
 		for i := 1; i <= 4; i++ {
@@ -68,6 +97,8 @@ func NewTCPConn(address string) (TCPCon, error) {
 	}
 
 	con, err := net.DialTCP("tcp", nil, tcpaddr)
+	serverAddr = con.RemoteAddr()
+
 	if err != nil {
 		return TCPCon{}, err
 	}
@@ -76,26 +107,6 @@ func NewTCPConn(address string) (TCPCon, error) {
 		con:        con,
 		addr:       address,
 		start_time: time.Now(),
-	}, nil
-}
-
-func NewUDPConn(serverAddress string) (*UDPCon, error) {
-	udpaddr, err := net.ResolveUDPAddr("udp", serverAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	con, err := net.DialUDP("udp", nil, udpaddr)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("LOCAL UDP ADDR: %s \n", con.LocalAddr().String())
-
-	return &UDPCon{
-		con:        con,
-		addr:       serverAddress,
-		start_time: time.Now(),
-		timestamp:  r.GS.Timestamp,
 	}, nil
 }
 
@@ -169,8 +180,12 @@ func (tcp *TCPCon) ListenPackets() error {
 			r.GS.UpdateFromInitialStatePacket(buf)
 			go tcp.sendStayAlivePackets()
 			// tcp.SendPlayerListRequestPacket()
-			udpCon, err := NewUDPConn(tcp.addr)
-			fmt.Println("Starting UDP Connection...")
+			udpRAdddr, err := net.ResolveUDPAddr("udp", tcp.con.RemoteAddr().String())
+			if err != nil {
+				panic(err)
+			}
+			udpCon, err := NewUDPConn(tcp.con.LocalAddr(), *udpRAdddr)
+			fmt.Println("Waiting for UDP Packet...")
 			tcp.udpCon = udpCon
 			if err != nil {
 				panic(err)

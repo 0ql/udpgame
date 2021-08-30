@@ -1,4 +1,4 @@
-package TCPutils
+package netUtils
 
 import (
 	"encoding/binary"
@@ -7,32 +7,16 @@ import (
 	"time"
 )
 
-var gs time.Time
-
-type TCPConBundle struct {
-	Connections          map[string]*TCPConnection
-	removeConnectionChan chan string
-	MAXPPS               uint
-}
-
-type TCPConnection struct {
-	addr         string
-	Con          net.Conn
-	ID           byte // same as player ID
-	pps          *uint
-	parentBundle *TCPConBundle
-}
-
 func (tcp *TCPConnection) createConnectRequestResponsePacket() []byte {
 	packet := make([]byte, 1)
 
 	packet = append(packet, tcp.ID)
 
-	duration := uint32(time.Since(gs).Milliseconds())
+	duration := uint32(time.Since(GS).Milliseconds())
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, duration)
 
-	packet = append(packet, byte(len(tcp.parentBundle.Connections)))
+	packet = append(packet, byte(len(tcp.parentBundle.tcp)))
 
 	buf = make([]byte, 4)
 	packet = append(packet, buf...)
@@ -83,31 +67,33 @@ func (tcp *TCPConnection) handleTCPConnection(kill chan string) {
 	}
 }
 
-func NewTCPConBundle(maxpps uint, gameStart time.Time) TCPConBundle {
-	gs = gameStart
-	return TCPConBundle{
-		Connections:          map[string]*TCPConnection{},
+func NewConBundle(maxpps uint, gameStart time.Time) ConBundle {
+	GS = gameStart
+	return ConBundle{
+		tcp:                  map[string]*TCPConnection{},
+		clients:              map[string]*Client{},
 		removeConnectionChan: make(chan string),
 		MAXPPS:               maxpps,
 	}
 }
 
 // blocking
-func (bundle *TCPConBundle) ConnectionRemover() {
+func (bundle *ConBundle) ConnectionRemover() {
 	for {
 		address := <-bundle.removeConnectionChan
-		delete(bundle.Connections, address)
-		fmt.Printf("Current Connection Count: %d\n", len(bundle.Connections))
+		delete(bundle.tcp, address)
+		delete(bundle.clients, address)
+		fmt.Printf("Current Connection Count: %d\n", len(bundle.tcp))
 	}
 }
 
 // blocking
-func (bundle *TCPConBundle) checkPpsAndReset() {
+func (bundle *ConBundle) checkPpsAndReset() {
 	for {
 		time.Sleep(time.Second)
-		for k, v := range bundle.Connections {
+		for k, v := range bundle.tcp {
 			if *v.pps > bundle.MAXPPS {
-				bundle.Connections[k].Con.Close()
+				bundle.tcp[k].Con.Close()
 				bundle.removeConnectionChan <- v.addr
 			} else {
 				*v.pps = 0
@@ -116,10 +102,10 @@ func (bundle *TCPConBundle) checkPpsAndReset() {
 	}
 }
 
-func (bundle *TCPConBundle) findAvailableID() (byte, bool) {
+func (bundle *ConBundle) findAvailableID() (byte, bool) {
 	for i := byte(0); i < 255; i++ {
 		found := true
-		for _, v := range bundle.Connections {
+		for _, v := range bundle.tcp {
 			if i == v.ID {
 				found = false
 			}
@@ -132,7 +118,7 @@ func (bundle *TCPConBundle) findAvailableID() (byte, bool) {
 }
 
 // blocking
-func (bundle *TCPConBundle) CreateTCPlistener(port string) error {
+func (bundle *ConBundle) CreateTCPlistener(port string) error {
 	tcpLn, err := net.Listen("tcp", port)
 	if err != nil {
 		return err
@@ -152,7 +138,7 @@ func (bundle *TCPConBundle) CreateTCPlistener(port string) error {
 		pps := uint(0)
 		if id, found := bundle.findAvailableID(); found {
 
-			bundle.Connections[con.RemoteAddr().String()] = &TCPConnection{
+			bundle.tcp[con.RemoteAddr().String()] = &TCPConnection{
 				addr:         con.RemoteAddr().String(),
 				Con:          con,
 				ID:           id,
@@ -160,7 +146,20 @@ func (bundle *TCPConBundle) CreateTCPlistener(port string) error {
 				parentBundle: bundle,
 			}
 
-			c := bundle.Connections[con.RemoteAddr().String()]
+			ua, err := net.ResolveUDPAddr("udp", con.RemoteAddr().String())
+			if err != nil {
+				panic(err)
+			}
+			bundle.clients[con.RemoteAddr().String()] = &Client{
+				addr: ua,
+				ID:   id,
+				PS: &PlayerState{
+					X: make([]byte, 4),
+					Y: make([]byte, 4),
+				},
+			}
+
+			c := bundle.tcp[con.RemoteAddr().String()]
 			go c.handleTCPConnection(bundle.removeConnectionChan)
 		}
 

@@ -2,8 +2,7 @@ package main
 
 import (
 	"fmt"
-	"server/TCPutils"
-	"server/UDPutils"
+	"server/netUtils"
 	"time"
 )
 
@@ -15,11 +14,11 @@ func createServer(port string) {
 	gameStart = time.Now()
 	fmt.Println("Server is starting...")
 
-	tcpConBundle := TCPutils.NewTCPConBundle(10, gameStart)
-	go tcpConBundle.ConnectionRemover()
-	go tcpConBundle.CreateTCPlistener(":8080")
+	conBundle := netUtils.NewConBundle(10, gameStart)
+	go conBundle.ConnectionRemover()
+	go conBundle.CreateTCPlistener(":8080")
 
-	udpLn := UDPutils.NewUDPListener(":8080", gameStart, &tcpConBundle)
+	udpLn := netUtils.NewUDPListener(":8080", gameStart, &conBundle)
 	go udpLn.HandleUDPPackets()
 	udpLn.SendUDPStatePackets(10)
 }

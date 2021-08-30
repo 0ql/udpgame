@@ -1,6 +1,7 @@
 package rendering
 
 import (
+	"client/util"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -49,26 +50,19 @@ func (s *state) UpdateFromInitialStatePacket(packet []byte) {
 
 func (s *state) UpdateFromPacket(packet []byte) {
 	fmt.Println("RSU")
-	s.playercount = packet[5]
+	d := util.NewPacketDecoder(packet)
+	d.SetIndex(5)
+	s.playercount = d.ExtractByte()
+	fmt.Println(s.playercount)
 
 	for i := 0; i < int(s.playercount); i++ {
-		for j := 6 + i*7; j <= 6+i*7+7; j++ {
-			coord_x := make([]byte, 4)
-
-			for k := 0; k <= 3; k++ {
-				coord_x[k] = packet[j+1+k]
-			}
-
-			coord_y := make([]byte, 4)
-			for k := 0; k <= 3; k++ {
-				coord_y[k] = packet[j+4+k]
-			}
-
-			s.Players[packet[i*7+6]] = &Player{
-				Id:      packet[i*7+6],
-				Coord_x: binary.BigEndian.Uint32(coord_x),
-				Coord_y: binary.BigEndian.Uint32(coord_y),
-			}
+		id := d.ExtractByte()
+		coord_x := d.ExtractData(4)
+		coord_y := d.ExtractData(4)
+		s.Players[id] = &Player{
+			Id:      id,
+			Coord_x: binary.BigEndian.Uint32(coord_x),
+			Coord_y: binary.BigEndian.Uint32(coord_y),
 		}
 	}
 }
