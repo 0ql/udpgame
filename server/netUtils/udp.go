@@ -96,7 +96,6 @@ func (udp *UDPListener) ReadState(addr net.Addr, packet []byte) {
 func (udp *UDPListener) HandleUDPPackets() {
 	buf := make([]byte, 100)
 
-	// var id uint8 = 0
 	for {
 		_, addr, err := udp.listener.ReadFrom(buf)
 		if err != nil {
@@ -105,21 +104,6 @@ func (udp *UDPListener) HandleUDPPackets() {
 			continue
 		}
 
-		// if _, ok := udp.clients[addr.String()]; !ok {
-		// 	fmt.Println("NEW UDP CON")
-		// 	// new UDP Con
-		// 	udp.clients[addr.String()] = &Client{
-		// 		addr: addr,
-		// 		ID:   byte(id),
-		// 		PS: &PlayerState{
-		// 			Timestamp: make([]byte, 0),
-		// 			X:         make([]byte, 4),
-		// 			Y:         make([]byte, 4),
-		// 		},
-		// 	}
-		// 	id++
-		// 	fmt.Println(byte(id))
-		// }
 		udp.ReadState(addr, buf)
 	}
 }

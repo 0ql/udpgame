@@ -12,7 +12,7 @@ import (
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "udpgame",
-		Bounds: pixel.R(0, 0, 1000, 500),
+		Bounds: pixel.R(0, 0, 500, 500),
 		VSync:  true,
 	}
 

@@ -66,7 +66,6 @@ func (udp *UDPCon) ListenPackets() error {
 	t := make([]byte, 4)
 	for {
 		_, addr, err := (*udp.con).ReadFrom(buf)
-		fmt.Println(buf)
 		if err != nil {
 			panic(err)
 		}
@@ -147,10 +146,9 @@ func (tcp *TCPCon) sendStayAlivePackets() {
 	packet := make([]byte, 0)
 
 	packet = append(packet, byte(4))
-	fmt.Println(packet)
 	for {
 		time.Sleep(500 * time.Millisecond)
-		fmt.Printf("Sending Stay Alive Packet to: %s \n", tcp.addr)
+		fmt.Printf("TCP SAL to: %s \n", tcp.addr)
 		_, err := tcp.con.Write(packet)
 		if err != nil {
 			tcp.errorChannel <- err
@@ -197,6 +195,8 @@ func (tcp *TCPCon) ListenPackets() error {
 		case 2:
 			// save playerlist
 			continue
+		case 4:
+			r.GS.RemovePlayer(buf[1])
 		}
 	}
 

@@ -3,7 +3,6 @@ package rendering
 import (
 	"client/util"
 	"encoding/binary"
-	"fmt"
 	"time"
 )
 
@@ -21,7 +20,6 @@ var (
 )
 
 func (s *state) UpdateFromInitialStatePacket(packet []byte) {
-	fmt.Println("Initial RSU")
 	var p Player
 	p.Id = packet[1]
 	s.My_id = packet[1]
@@ -36,7 +34,6 @@ func (s *state) UpdateFromInitialStatePacket(packet []byte) {
 	s.playercount = packet[6]
 	for i := 7; i <= 10; i++ {
 		buf[i-7] = packet[i]
-		fmt.Println(i)
 	}
 	p.Coord_x = binary.BigEndian.Uint32(buf)
 
@@ -49,11 +46,9 @@ func (s *state) UpdateFromInitialStatePacket(packet []byte) {
 }
 
 func (s *state) UpdateFromPacket(packet []byte) {
-	fmt.Println("RSU")
 	d := util.NewPacketDecoder(packet)
 	d.SetIndex(5)
 	s.playercount = d.ExtractByte()
-	fmt.Println(s.playercount)
 
 	for i := 0; i < int(s.playercount); i++ {
 		id := d.ExtractByte()
@@ -81,4 +76,8 @@ func (s *state) ToPacket(st time.Time) []byte {
 	packet = append(packet, buf...)
 
 	return packet
+}
+
+func (s *state) RemovePlayer(id byte) {
+	delete(s.Players, id)
 }

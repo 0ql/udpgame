@@ -77,12 +77,25 @@ func NewConBundle(maxpps uint, gameStart time.Time) ConBundle {
 	}
 }
 
+func (bundle *ConBundle) SendEveryoneOverTCP(packet []byte) {
+	for _, v := range bundle.tcp {
+		_, err := v.Con.Write(packet)
+		if err != nil {
+			bundle.removeConnectionChan <- v.addr
+		}
+	}
+}
+
 // blocking
 func (bundle *ConBundle) ConnectionRemover() {
 	for {
 		address := <-bundle.removeConnectionChan
+		packet := make([]byte, 2)
+		packet[1] = byte(bundle.tcp[address].ID)
+		packet[0] = byte(4)
 		delete(bundle.tcp, address)
 		delete(bundle.clients, address)
+		go bundle.SendEveryoneOverTCP(packet)
 		fmt.Printf("Current Connection Count: %d\n", len(bundle.tcp))
 	}
 }
