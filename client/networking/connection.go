@@ -129,7 +129,7 @@ func (tcp *TCPCon) SendConnectRequestPacket(playerName string) error {
 	return nil
 }
 
-func (tcp *TCPCon) SendPlayerListRequestPacket() error {
+func (tcp *TCPCon) sendPlayerListRequestPacket() error {
 	packet := make([]byte, 0)
 
 	packet = append(packet, byte(2))
@@ -157,6 +157,22 @@ func (tcp *TCPCon) sendStayAlivePackets() {
 	}
 }
 
+func (tcp *TCPCon) startUDP() {
+	udpRAdddr, err := net.ResolveUDPAddr("udp", tcp.con.RemoteAddr().String())
+	if err != nil {
+		panic(err)
+	}
+	udpCon, err := NewUDPConn(tcp.con.LocalAddr(), *udpRAdddr)
+	if err != nil {
+		panic(err)
+	}
+	tcp.udpCon = udpCon
+
+	fmt.Println("Waiting for UDP Packet...")
+	go tcp.udpCon.ListenPackets()
+	go tcp.udpCon.sendStatePackets(30)
+}
+
 func (tcp *TCPCon) ListenPackets() error {
 	buf := make([]byte, 100)
 
@@ -178,18 +194,7 @@ func (tcp *TCPCon) ListenPackets() error {
 			r.GS.UpdateFromInitialStatePacket(buf)
 			go tcp.sendStayAlivePackets()
 			// tcp.SendPlayerListRequestPacket()
-			udpRAdddr, err := net.ResolveUDPAddr("udp", tcp.con.RemoteAddr().String())
-			if err != nil {
-				panic(err)
-			}
-			udpCon, err := NewUDPConn(tcp.con.LocalAddr(), *udpRAdddr)
-			fmt.Println("Waiting for UDP Packet...")
-			tcp.udpCon = udpCon
-			if err != nil {
-				panic(err)
-			}
-			go tcp.udpCon.ListenPackets()
-			go tcp.udpCon.sendStatePackets(30)
+			tcp.startUDP()
 		case 1:
 			continue
 		case 2:

@@ -3,10 +3,17 @@ package main
 import (
 	n "client/networking"
 	"client/rendering"
+	"fmt"
+	"time"
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"golang.org/x/image/colornames"
+)
+
+var (
+	frames = 0
+	second = time.Tick(time.Second)
 )
 
 func run() {
@@ -34,6 +41,14 @@ func run() {
 		}
 
 		win.Update()
+
+		frames++
+		select {
+		case <-second:
+			win.SetTitle(fmt.Sprintf("%s | FPS: %d", cfg.Title, frames))
+			frames = 0
+		default:
+		}
 	}
 }
 
