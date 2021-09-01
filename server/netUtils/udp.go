@@ -50,8 +50,8 @@ func (udp *UDPListener) SendUDPStatePackets(Hz int) {
 			packet = append(packet, v.PS.X...)
 			packet = append(packet, v.PS.Y...)
 		}
-
 		fmt.Println(packet)
+
 		for _, v := range b.clients {
 			_, _, err := udp.listener.WriteMsgUDP(packet, nil, v.addr)
 			if err != nil {
@@ -62,6 +62,36 @@ func (udp *UDPListener) SendUDPStatePackets(Hz int) {
 }
 
 func (udp *UDPListener) ReadState(addr net.Addr, packet []byte) {
+	/*b := udp.bundle
+	fmt.Println(packet)
+
+	decoder := util.NewPacketDecoder(packet)
+
+	var p PlayerState = PlayerState{}
+
+	t := decoder.ExtractData(4)
+	fmt.Println(t)
+
+	// check if packet outdated
+	if b.clients[addr.String()] != nil {
+		if bytes.Compare(t, b.clients[addr.String()].timestamp) == -1 {
+			return
+		} else {
+			b.clients[addr.String()].timestamp = t
+		}
+	} else {
+		panic("Receved Packet from non registered Client")
+	}
+
+	x := decoder.ExtractData(4)
+	fmt.Println(x)
+	p.X = x
+
+	y := decoder.ExtractData(4)
+	fmt.Println(y)
+	p.Y = y
+
+	b.clients[addr.String()].PS = &p*/
 	b := udp.bundle
 
 	buf := make([]byte, 4)

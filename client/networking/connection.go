@@ -9,7 +9,13 @@ import (
 	"time"
 )
 
-var serverAddr net.Addr
+var (
+	serverAddr net.Addr
+	TCPPPSDOWN = 0
+	TCPPPSUP   = 0
+	UDPPPSDOWN = 0
+	UDPPPSUP   = 0
+)
 
 type UDPCon struct {
 	raddr      net.UDPAddr
@@ -48,12 +54,13 @@ func NewUDPConn(localAddr net.Addr, raddr net.UDPAddr) (*UDPCon, error) {
 }
 
 func (udp *UDPCon) sendStatePackets(Hz int) error {
-	dur := time.Duration(1000 / Hz)
+	dur := time.Duration(1000 / Hz * int(time.Millisecond))
 	for {
 		time.Sleep(dur)
 
 		p := r.GS.ToPacket(udp.start_time)
 		_, _, err := udp.con.WriteMsgUDP(p, nil, &udp.raddr)
+		UDPPPSUP++
 		if err != nil {
 			panic(err)
 		}
@@ -66,6 +73,7 @@ func (udp *UDPCon) ListenPackets() error {
 	t := make([]byte, 4)
 	for {
 		_, addr, err := (*udp.con).ReadFrom(buf)
+		UDPPPSDOWN++
 		if err != nil {
 			panic(err)
 		}
@@ -122,6 +130,7 @@ func (tcp *TCPCon) SendConnectRequestPacket(playerName string) error {
 	packet = append(packet, name...)
 
 	_, err := tcp.con.Write(packet)
+	TCPPPSUP++
 	if err != nil {
 		return err
 	}
@@ -134,6 +143,7 @@ func (tcp *TCPCon) sendPlayerListRequestPacket() error {
 
 	packet = append(packet, byte(2))
 	_, err := tcp.con.Write(packet)
+	TCPPPSUP++
 	if err != nil {
 		return err
 	}
@@ -150,6 +160,7 @@ func (tcp *TCPCon) sendStayAlivePackets() {
 		time.Sleep(500 * time.Millisecond)
 		fmt.Printf("TCP SAL to: %s \n", tcp.addr)
 		_, err := tcp.con.Write(packet)
+		TCPPPSUP++
 		if err != nil {
 			tcp.errorChannel <- err
 			break
@@ -183,6 +194,7 @@ func (tcp *TCPCon) ListenPackets() error {
 		}
 
 		_, err = tcp.con.Read(buf)
+		TCPPPSDOWN++
 		if err != nil {
 			fmt.Println("Error receiving TCP packet")
 			return err
@@ -190,7 +202,7 @@ func (tcp *TCPCon) ListenPackets() error {
 
 		switch buf[0] {
 		case 0:
-			fmt.Println("TCPConnection Confirmed")
+			fmt.Printf("TCPConnection Confirmed: Player ID: %d \n", buf[1])
 			r.GS.UpdateFromInitialStatePacket(buf)
 			go tcp.sendStayAlivePackets()
 			// tcp.SendPlayerListRequestPacket()

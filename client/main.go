@@ -19,12 +19,11 @@ var (
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "udpgame",
-		Bounds: pixel.R(0, 0, 500, 500),
+		Bounds: pixel.R(0, 0, 600, 500),
 		VSync:  true,
 	}
 
 	win, err := pixelgl.NewWindow(cfg)
-
 	if err != nil {
 		panic(err)
 	}
@@ -45,8 +44,12 @@ func run() {
 		frames++
 		select {
 		case <-second:
-			win.SetTitle(fmt.Sprintf("%s | FPS: %d", cfg.Title, frames))
+			win.SetTitle(fmt.Sprintf("%s | FPS: %d | TCP %d↓ %d↑ | UDP %d↓ %d↑", cfg.Title, frames, n.TCPPPSDOWN, n.TCPPPSUP, n.UDPPPSDOWN, n.UDPPPSUP))
 			frames = 0
+			n.TCPPPSDOWN = 0
+			n.TCPPPSUP = 0
+			n.UDPPPSDOWN = 0
+			n.UDPPPSUP = 0
 		default:
 		}
 	}
