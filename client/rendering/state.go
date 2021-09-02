@@ -3,6 +3,7 @@ package rendering
 import (
 	"client/util"
 	"encoding/binary"
+	"sync"
 	"time"
 )
 
@@ -17,9 +18,13 @@ var (
 	GS = state{
 		Players: map[byte]*Player{},
 	}
+
+	StateMutex = sync.Mutex{}
 )
 
 func (s *state) UpdateFromInitialStatePacket(packet []byte) {
+	StateMutex.Lock()
+
 	var p Player
 	p.Id = packet[1]
 	s.My_id = packet[1]
@@ -43,9 +48,13 @@ func (s *state) UpdateFromInitialStatePacket(packet []byte) {
 	p.Coord_y = binary.BigEndian.Uint32(buf)
 
 	s.Players[packet[1]] = &p
+
+	StateMutex.Unlock()
 }
 
 func (s *state) UpdateFromPacket(packet []byte) {
+	StateMutex.Lock()
+
 	d := util.NewPacketDecoder(packet)
 	d.SetIndex(5)
 	s.playercount = d.ExtractByte()
@@ -60,9 +69,13 @@ func (s *state) UpdateFromPacket(packet []byte) {
 			Coord_y: binary.BigEndian.Uint32(coord_y),
 		}
 	}
+
+	StateMutex.Unlock()
 }
 
 func (s *state) ToPacket(st time.Time) []byte {
+	StateMutex.Lock()
+
 	packet := make([]byte, 1)
 
 	duration := uint32(time.Since(st).Milliseconds())
@@ -75,9 +88,15 @@ func (s *state) ToPacket(st time.Time) []byte {
 	binary.BigEndian.PutUint32(buf, s.Players[s.My_id].Coord_y)
 	packet = append(packet, buf...)
 
+	StateMutex.Unlock()
+
 	return packet
 }
 
 func (s *state) RemovePlayer(id byte) {
+	StateMutex.Lock()
+
 	delete(s.Players, id)
+
+	StateMutex.Unlock()
 }

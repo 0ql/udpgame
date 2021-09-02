@@ -31,6 +31,7 @@ func run() {
 	for !win.Closed() {
 		win.Clear(colornames.Whitesmoke)
 
+		rendering.StateMutex.Lock()
 		for key := range rendering.GS.Players {
 			player := rendering.GS.Players[key]
 			if player.Id == rendering.GS.My_id {
@@ -38,6 +39,7 @@ func run() {
 			}
 			player.Draw(win)
 		}
+		rendering.StateMutex.Unlock()
 
 		win.Update()
 
