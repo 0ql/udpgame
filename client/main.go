@@ -12,8 +12,17 @@ import (
 )
 
 var (
-	frames = 0
-	second = time.Tick(time.Second)
+	frames     = 0
+	second     = time.Tick(time.Second)
+	PlayerName = ""
+	TcpCon     n.TCPCon
+	widget     = rendering.TextFieldWidgetNew(pixel.V(32, 32), 200.0, 64.0, func(text string) {
+		if PlayerName == "" {
+			PlayerName = text
+			TcpCon.SendConnectRequestPacket(PlayerName)
+		}
+	})
+	label = rendering.LabelNew("Please enter your nickname below", pixel.V(32, 200), 200.0, 20.0)
 )
 
 func run() {
@@ -31,29 +40,35 @@ func run() {
 	for !win.Closed() {
 		win.Clear(colornames.Whitesmoke)
 
-		rendering.StateMutex.Lock()
-		for key := range rendering.GS.Players {
-			player := rendering.GS.Players[key]
-			if player.Id == rendering.GS.My_id {
-				player.Update(win)
+		if PlayerName != "" {
+			rendering.StateMutex.Lock()
+			for key := range rendering.GS.Players {
+				player := rendering.GS.Players[key]
+				if player.Id == rendering.GS.My_id {
+					player.Update(win)
+				}
+				player.Draw(win)
 			}
-			player.Draw(win)
+			rendering.StateMutex.Unlock()
+
+			frames++
+			select {
+			case <-second:
+				win.SetTitle(fmt.Sprintf("%s | FPS: %d | TCP %d↓ %d↑ | UDP %d↓ %d↑", cfg.Title, frames, n.TCPPPSDOWN, n.TCPPPSUP, n.UDPPPSDOWN, n.UDPPPSUP))
+				frames = 0
+				n.TCPPPSDOWN = 0
+				n.TCPPPSUP = 0
+				n.UDPPPSDOWN = 0
+				n.UDPPPSUP = 0
+			default:
+			}
+		} else {
+			widget.Update(win)
+			widget.Draw(win)
+			label.Draw(win)
 		}
-		rendering.StateMutex.Unlock()
 
 		win.Update()
-
-		frames++
-		select {
-		case <-second:
-			win.SetTitle(fmt.Sprintf("%s | FPS: %d | TCP %d↓ %d↑ | UDP %d↓ %d↑", cfg.Title, frames, n.TCPPPSDOWN, n.TCPPPSUP, n.UDPPPSDOWN, n.UDPPPSUP))
-			frames = 0
-			n.TCPPPSDOWN = 0
-			n.TCPPPSUP = 0
-			n.UDPPPSDOWN = 0
-			n.UDPPPSUP = 0
-		default:
-		}
 	}
 }
 
@@ -63,12 +78,10 @@ func main() {
 		panic(err)
 	}
 
+	go tcpConnection.SendStayAlivePackets()
 	go tcpConnection.ListenPackets()
 
-	err = tcpConnection.SendConnectRequestPacket("hans")
-	if err != nil {
-		panic(err)
-	}
+	TcpCon = tcpConnection
 
 	pixelgl.Run(run)
 }

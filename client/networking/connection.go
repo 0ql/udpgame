@@ -152,7 +152,7 @@ func (tcp *TCPCon) sendPlayerListRequestPacket() error {
 }
 
 // blocking
-func (tcp *TCPCon) sendStayAlivePackets() {
+func (tcp *TCPCon) SendStayAlivePackets() {
 	packet := make([]byte, 0)
 
 	packet = append(packet, byte(4))
@@ -204,7 +204,6 @@ func (tcp *TCPCon) ListenPackets() error {
 		case 0:
 			fmt.Printf("TCPConnection Confirmed: Player ID: %d \n", buf[1])
 			r.GS.UpdateFromInitialStatePacket(buf)
-			go tcp.sendStayAlivePackets()
 			// tcp.SendPlayerListRequestPacket()
 			tcp.startUDP()
 		case 1:
